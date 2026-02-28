@@ -1,4 +1,5 @@
 const { createClient } = require('@supabase/supabase-js');
+const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 
 const supabase = createClient(
@@ -41,7 +42,12 @@ async function login(req, res) {
 
     if (data.password === password) {
       const user = new User(data);
-      res.status(200).json({ message: 'Login successful', user });
+      const token = jwt.sign(
+        { id: user.id, email: user.email, rol: user.rol },
+        process.env.JWT_SECRET,
+        { expiresIn: '24h' }
+      );
+      res.status(200).json({ message: 'Login successful', token, user });
     } else {
       res.status(401).json({ error: 'Invalid password' });
     }
