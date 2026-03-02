@@ -1,12 +1,16 @@
 const { createClient } = require('@supabase/supabase-js');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
+const { generateSecret, generate, verify } = require('otplib');
 const User = require('../models/User');
+const { sendPasswordResetEmail } = require('../services/emailService');
 
 const supabase = createClient(
   process.env.SUPABASE_URL,
   process.env.SECRET_KEY_SUPABASE
 );
+
+const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 async function getAllUsers(req, res) {
   try {
@@ -40,8 +44,7 @@ async function registerUser(req, res) {
     }
 
     // Validate email format
-    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-    if (!emailRegex.test(email)) {
+    if (!EMAIL_REGEX.test(email)) {
       return res.status(400).json({ error: 'Invalid email format' });
     }
 
@@ -127,8 +130,156 @@ async function login(req, res) {
   }
 }
 
+async function requestPasswordReset (req, res) {
+  try {
+    const { email } = req.body;
+
+    if (!email) {
+      return res.status(400).json({ error: 'El email es obligatorio' });
+    }
+
+    if (!EMAIL_REGEX.test(email)) {
+      return res.status(400).json({ error: 'Email no válido' });
+    }
+
+    const { data: user, error: userError } = await supabase
+      .from('Users')
+      .select('id, email')
+      .eq('email', email)
+      .single();
+
+    if (userError || !user) {
+      return res.status(200).json({
+        message: 'Si existe una cuenta con ese email, recibirás un código por correo.'
+      });
+    }
+
+    const secret = generateSecret();
+    const token = await generate({ secret, strategy: 'hotp', counter: 0 });
+    const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString(); // 15 minutos
+
+    const { error: insertError } = await supabase
+      .from('password_reset_otps')
+      .insert({ email: user.email, otp: secret, expires_at: expiresAt });
+
+    if (insertError) {
+      console.error('Error saving password reset token:', insertError);
+      return res.status(500).json({ error: 'Error al guardar el token de recuperación de contraseña' });
+    }
+
+    await sendPasswordResetEmail(user.email, token);
+
+    res.status(200).json({
+      message: 'Si existe una cuenta con ese email, recibirás un código por correo.'
+    });
+
+  } catch (err) {
+    console.error('Error requesting password reset:', err.message || err);
+    return res.status(500).json({ error: 'Error al solicitar recuperación de contraseña' });
+  }
+}
+
+async function verifyToken (req, res) {
+  try {
+    const { email, token } = req.body;
+
+    if (!email || !token) {
+      return res.status(400).json({ error: 'Faltan email o código' });
+    }
+
+    if (!EMAIL_REGEX.test(email)) {
+      return res.status(400).json({ error: 'Email no válido' });
+    }
+
+    const { data: otpRow, error: otpError } = await supabase
+      .from('password_reset_otps')
+      .select('id, otp, expires_at')
+      .eq('email', email)
+      .gte('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (otpError || !otpRow) {
+      return res.status(200).json({ valid: false });
+    }
+
+    const secret = otpRow.otp;
+    const verification = await verify({ secret, token, strategy: 'hotp', counter: 0 });
+    if (verification.valid) {
+      await supabase
+        .from('password_reset_otps')
+        .update({ used: true })
+        .eq('id', otpRow.id);
+    }
+    return res.status(200).json({ valid: verification.valid });
+  } catch (err) {
+    console.error('Error verifying token:', err.message || err);
+    return res.status(500).json({ error: 'Error al verificar el código' });
+  }
+}
+
+async function resetPassword (req, res) {
+  try {
+    const { email, token, newPassword } = req.body;
+
+    if (!email || !token || !newPassword) {
+      return res.status(400).json({ error: 'Faltan email, código o nueva contraseña' });
+    }
+
+    if (!EMAIL_REGEX.test(email)) {
+      return res.status(400).json({ error: 'Email no válido' });
+    }
+
+    const { data: otpRow, error: otpError } = await supabase
+      .from('password_reset_otps')
+      .select('id, email, otp, expires_at')
+      .eq('email', email)
+      .gte('expires_at', new Date().toISOString())
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    if (otpError || !otpRow) {
+      return res.status(400).json({ error: 'Código no válido o expirado. Solicita uno nuevo.' });
+    }
+
+    const secret = otpRow.otp;
+    const verification = await verify({ secret, token, strategy: 'hotp', counter: 0 });
+    if (!verification.valid) {
+      return res.status(400).json({ error: 'Código incorrecto' });
+    }
+
+    const saltRounds = 10;
+    const hashedPassword = await bcrypt.hash(newPassword, saltRounds);
+
+    const { error: updateError } = await supabase
+      .from('Users')
+      .update({ password: hashedPassword })
+      .eq('email', email);
+
+    if (updateError) {
+      console.error('Error updating password:', updateError);
+      return res.status(500).json({ error: 'Error al actualizar la contraseña' });
+    }
+
+    await supabase
+      .from('password_reset_otps')
+      .delete()
+      .eq('id', otpRow.id);
+
+    res.status(200).json({ message: 'Contraseña actualizada. Ya puedes iniciar sesión.' });
+  } catch (err) {
+    console.error('Error resetting password:', err.message || err);
+    return res.status(500).json({ error: 'Error al restablecer la contraseña' });
+  }
+}
+
 module.exports = {
   getAllUsers,
   login,
-  registerUser
+  registerUser,
+  requestPasswordReset,
+  verifyToken,
+  resetPassword
 };
