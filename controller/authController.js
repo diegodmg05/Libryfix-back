@@ -237,8 +237,8 @@ async function resetPassword(req, res) {
 
     await supabase
       .from('password_reset_otps')
-      .delete()
-      .eq('id', otpRow.id);
+      .update({ used: true })
+      .eq('id', otpRow.id); //Mantener asi para trazabilidad, de ahi el campo used a true
 
     res.status(200).json({ message: 'Password updated. You can now sign in.' });
   } catch (err) {
