@@ -9,6 +9,7 @@ const { createClient } = require('@supabase/supabase-js');
 
 const app = express();
 const userRoutes = require('./routes/userRoutes');
+const authRoutes = require('./routes/authRoutes');
 
 // ===============================
 // VALIDACIÓN DE VARIABLES .ENV
@@ -50,6 +51,7 @@ app.use(cors({
   credentials: true
 }));
 
+app.use('/auth', authRoutes);
 app.use('/users', userRoutes);
 
 
