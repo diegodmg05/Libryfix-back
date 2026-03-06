@@ -1,7 +1,7 @@
 const { createClient } = require('@supabase/supabase-js');
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcrypt');
-const { generateSecret, generate, verify } = require('otplib');
+const crypto = require('crypto');
 const User = require('../models/User');
 const { sendPasswordResetEmail } = require('../services/emailService');
 
@@ -127,13 +127,12 @@ async function requestPasswordReset(req, res) {
       });
     }
 
-    const secret = generateSecret();
-    const token = await generate({ secret, strategy: 'hotp', counter: 0 });
+    const token = crypto.randomInt(100000, 999999).toString();
     const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 
     const { error: insertError } = await supabase
       .from('password_reset_otps')
-      .insert({ email: user.email, otp: secret, expires_at: expiresAt });
+      .insert({ email: user.email, otp: token, expires_at: expiresAt });
 
     if (insertError) {
       console.error('Error saving password reset token:', insertError);
@@ -167,6 +166,7 @@ async function verifyToken(req, res) {
       .from('password_reset_otps')
       .select('id, otp, expires_at')
       .eq('email', email)
+      .eq('used', false)
       .gte('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false })
       .limit(1)
@@ -176,15 +176,8 @@ async function verifyToken(req, res) {
       return res.status(200).json({ valid: false });
     }
 
-    const secret = otpRow.otp;
-    const verification = await verify({ secret, token, strategy: 'hotp', counter: 0 });
-    if (verification.valid) {
-      await supabase
-        .from('password_reset_otps')
-        .update({ used: true })
-        .eq('id', otpRow.id);
-    }
-    return res.status(200).json({ valid: verification.valid });
+    const isValid = otpRow.otp === token;
+    return res.status(200).json({ valid: isValid });
   } catch (err) {
     console.error('Error verifying token:', err.message || err);
     return res.status(500).json({ error: 'Error verifying code' });
@@ -207,6 +200,7 @@ async function resetPassword(req, res) {
       .from('password_reset_otps')
       .select('id, email, otp, expires_at')
       .eq('email', email)
+      .eq('used', false)
       .gte('expires_at', new Date().toISOString())
       .order('created_at', { ascending: false })
       .limit(1)
@@ -216,9 +210,8 @@ async function resetPassword(req, res) {
       return res.status(400).json({ error: 'Invalid or expired code. Request a new one.' });
     }
 
-    const secret = otpRow.otp;
-    const verification = await verify({ secret, token, strategy: 'hotp', counter: 0 });
-    if (!verification.valid) {
+    const isValid = otpRow.otp === token;
+    if (!isValid) {
       return res.status(400).json({ error: 'Invalid code' });
     }
 
