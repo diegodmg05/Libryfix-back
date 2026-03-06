@@ -21,7 +21,6 @@
     "mongoose": "^9.1.6",
     "morgan": "^1.10.1",
     "nodemailer": "^8.0.1",
-    "otplib": "^13.3.0",
     "supabase": "^2.76.3"
   }
 }
