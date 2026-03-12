@@ -4,7 +4,7 @@ const User = require('../models/User');
 async function getAllUsers() {
   const { data, error } = await supabase
     .from('Users')
-    .select('id, name, surname, email, password, rol, status, created_at');
+    .select('id, name, surname, email, rol, status, created_at');
 
   if (error) {
     const err = new Error(error.message);
