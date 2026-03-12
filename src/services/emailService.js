@@ -3,10 +3,10 @@ const { transporter, nodemailer } = require('../config/nodemailer');
 const FROM_EMAIL = process.env.SMTP_FROM ||
   (process.env.SMTP_USER ? `Libryfix <${process.env.SMTP_USER}>` : 'Libryfix <noreply@libryfix.com>');
 
-async function sendPasswordResetEmail (to, otp) {
+async function sendPasswordResetEmail(to, otp) {
   const info = await transporter.sendMail({
     from: FROM_EMAIL,
-    to: to,
+    to,
     subject: 'Código para recuperar tu contraseña - Libryfix',
     text: `Tu código de verificación es: ${otp}. Válido durante 15 minutos.`,
     html: `
@@ -19,9 +19,11 @@ async function sendPasswordResetEmail (to, otp) {
       </div>
     `
   });
+
   if (process.env.SMTP_HOST === 'smtp.ethereal.email' && nodemailer.getTestMessageUrl) {
     console.log('Vista previa correo:', nodemailer.getTestMessageUrl(info));
   }
+
   return info;
 }
 
