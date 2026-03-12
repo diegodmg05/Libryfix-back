@@ -5,10 +5,10 @@
   "license": "ISC",
   "author": "",
   "type": "commonjs",
-  "main": "index.js",
+  "main": "server.js",
   "scripts": {
-    "start": "node app.js",
-    "dev": "node app.js",
+    "start": "node server.js",
+    "dev": "node server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
@@ -21,6 +21,7 @@
     "mongoose": "^9.1.6",
     "morgan": "^1.10.1",
     "nodemailer": "^8.0.1",
+    "otplib": "^13.3.0",
     "supabase": "^2.76.3"
   }
 }

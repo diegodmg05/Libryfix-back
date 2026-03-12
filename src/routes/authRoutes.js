@@ -5,7 +5,7 @@ const {
   requestPasswordReset,
   verifyToken,
   resetPassword
-} = require('../controller/authController');
+} = require('../controllers/authController');
 
 const router = express.Router();
 
