@@ -65,12 +65,17 @@ async function loginUser({ email, password }) {
 }
 
 async function requestPasswordReset(email) {
-  const { data: user } = await supabase
+  const { data: user, error } = await supabase
     .from('Users')
     .select('id, email')
     .eq('email', email)
-    .single();
+    .maybeSingle();
 
+  if (error) {
+    const err = new Error(error.message);
+    err.status = 500;
+    throw err;
+  }
   // Silencioso para evitar enumeración de usuarios
   if (!user) return;
 
