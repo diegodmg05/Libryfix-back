@@ -60,7 +60,8 @@ async function loginUser({ email, password }) {
     { expiresIn: '24h' }
   );
 
-  return { token, user };
+  const { password: _pwd, ...safeUser } = user;
+  return { token, user: safeUser };
 }
 
 async function requestPasswordReset(email) {
