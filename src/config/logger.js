@@ -19,7 +19,7 @@ const appTransport = pino.transport({
 const httpTransport = pino.transport({
     targets: [
         {
-            target: "pino-file",
+            target: "pino/file",
             options: { destination: './logs/http.log', mkdir: true, colorize: false }
         },
         {
