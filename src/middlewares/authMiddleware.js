@@ -1,4 +1,5 @@
 const jwt = require('jsonwebtoken');
+const { createAppError } = require('../utils/AppError');
 
 /**
  * Middleware que verifica el JWT en la cabecera Authorization.
@@ -8,7 +9,7 @@ function authMiddleware(req, res, next) {
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
-    return res.status(401).json({ error: 'No se ha proporcionado un token de autenticación' });
+    return next(createAppError('No se ha proporcionado un token de autenticación', 401));
   }
 
   const token = authHeader.split(' ')[1];
@@ -18,7 +19,7 @@ function authMiddleware(req, res, next) {
     req.user = decoded;
     next();
   } catch (err) {
-    return res.status(401).json({ error: 'Token inválido o expirado' });
+    return next(createAppError('Token inválido o expirado', 401));
   }
 }
 

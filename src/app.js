@@ -1,9 +1,9 @@
 const express = require('express');
-const fs = require('fs');
-const path = require('path');
-const morgan = require('morgan');
+const pinoHttp = require('pino-http');
+const { httpLogger } = require('./config/logger');
 const cors = require('cors');
 const router = require('./routes');
+const { createAppError } = require('./utils/AppError');
 const errorHandler = require('./middlewares/errorHandler');
 
 const app = express();
@@ -12,11 +12,32 @@ const app = express();
 // LOGGING
 // ===============================
 
-const logStream = fs.createWriteStream(
-  path.join(__dirname, '..', 'access.log'),
-  { flags: 'a' }
+app.use(
+  pinoHttp({
+    logger: httpLogger,
+    customLogLevel(req, res, err) {
+      if (err || res.statusCode >= 500) {
+        return 'error';
+      }
+
+      if (res.statusCode >= 400) {
+        return 'warn';
+      }
+
+      return 'info';
+    },
+    customSuccessMessage(req, res) {
+      return `${req.method} ${req.originalUrl} completed with ${res.statusCode}`;
+    },
+    customErrorMessage(req, res, err) {
+      return `${req.method} ${req.originalUrl} failed with ${res.statusCode}: ${err.message}`;
+    },
+    customReceivedMessage(req) {
+      return `${req.method} ${req.originalUrl} received`;
+    }
+  })
 );
-app.use(morgan('combined', { stream: logStream }));
+
 
 // ===============================
 // MIDDLEWARES
@@ -40,8 +61,8 @@ app.use('/', router);
 // 404
 // ===============================
 
-app.use((req, res) => {
-  res.status(404).json({ error: 'Ruta no encontrada' });
+app.use((req, res, next) => {
+  next(createAppError('Ruta no encontrada', 404));
 });
 
 // ===============================

@@ -4,9 +4,11 @@ const REQUIRED_VARS = [
   'JWT_SECRET'
 ];
 
+const { logger } = require('./logger');
+
 REQUIRED_VARS.forEach((key) => {
   if (!process.env[key]) {
-    console.error(`❌ Falta la variable de entorno requerida: ${key}`);
+    logger.error({ missing: key }, `❌ Falta la variable de entorno requerida: ${key}`);
     process.exit(1);
   }
 });
