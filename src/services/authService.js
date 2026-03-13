@@ -8,11 +8,16 @@ const { createAppError } = require('../utils/AppError');
 const { sendPasswordResetEmail } = require('./emailService');
 
 async function registerUser({ name, surname, email, password }) {
-  const { data: existingUser } = await supabase
+  const { data: existingUser, error: existingUserError } = await supabase
     .from('Users')
     .select('email')
     .eq('email', email)
-    .single();
+    .maybeSingle();
+
+  if (existingUserError) {
+    logger.error({ email, error: existingUserError.message }, 'Error buscando usuario existente por email');
+    throw createAppError('No se pudo verificar el email del usuario', 500, existingUserError.message);
+  }
 
   if (existingUser) {
     logger.warn({ email }, 'Registro rechazado: email ya registrado');
