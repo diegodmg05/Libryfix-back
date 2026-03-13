@@ -28,8 +28,9 @@ async function sendPasswordResetEmail(to, otp) {
 
     return info;
   } catch (err) {
-    logger.error({ to, error: err.message }, 'Error enviando correo de recuperación');
-    throw err;
+    logger.error({ to, error: err }, 'Error enviando correo de recuperación');
+    const safeError = new Error('No se pudo enviar el correo de recuperación de contraseña.', { cause: err });
+    throw safeError;
   }
 }
 
