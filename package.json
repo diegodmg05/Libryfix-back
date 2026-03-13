@@ -10,7 +10,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "node server.js",
-    "start:pretty": "node server.js 2>&1 | npx pino-pretty",
+    "start:pretty": "PINO_PRETTY=true node server.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "dependencies": {
