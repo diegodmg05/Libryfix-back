@@ -2,56 +2,60 @@ const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
 const { hotp, authenticator } = require('otplib');
 const supabase = require('../config/supabase');
+const { logger } = require('../config/logger');
 const User = require('../models/User');
+const { createAppError } = require('../utils/AppError');
 const { sendPasswordResetEmail } = require('./emailService');
 
 async function registerUser({ name, surname, email, password }) {
-  const { data: existingUser } = await supabase
+  const { data: existingUser, error: existingUserError } = await supabase
     .from('Users')
     .select('email')
     .eq('email', email)
-    .single();
+    .maybeSingle();
+
+  if (existingUserError) {
+    logger.error({ email, error: existingUserError.message }, 'Error buscando usuario existente por email');
+    throw createAppError('No se pudo verificar el email del usuario', 500, existingUserError.message);
+  }
 
   if (existingUser) {
-    const err = new Error('Email already registered');
-    err.status = 409;
-    throw err;
+    logger.warn({ email }, 'Registro rechazado: email ya registrado');
+    throw createAppError('Email already registered', 409);
   }
 
   const hashedPassword = await bcrypt.hash(password, 10);
 
-  const { data, error } = await supabase
+  const { data, error: userError } = await supabase
     .from('Users')
     .insert([{ name, surname, email, password: hashedPassword, rol: 2, status: true }])
     .select('id, name, surname, email, password, rol, status, created_at');
 
-  if (error) {
-    const err = new Error(error.message);
-    err.status = 500;
-    throw err;
+  if (userError) {
+    logger.error({ email, error: userError.message }, 'Error al registrar usuario en base de datos');
+    throw createAppError('No se pudo registrar el usuario', 500, userError.message);
   }
 
   return new User(data[0]);
 }
 
 async function loginUser({ email, password }) {
-  const { data, error } = await supabase
+  const { data, error: userError } = await supabase
     .from('Users')
     .select('id, name, surname, email, password, rol, status, created_at')
     .eq('email', email)
     .single();
 
-  if (error || !data) {
-    const err = new Error('Invalid email or password');
-    err.status = 401;
-    throw err;
+  if (userError || !data) {
+    logger.warn({ email }, 'Login fallido: credenciales inválidas (usuario no encontrado)');
+    throw createAppError('Invalid email or password', 401);
   }
 
   const isPasswordValid = await bcrypt.compare(password, data.password);
+  
   if (!isPasswordValid) {
-    const err = new Error('Invalid email or password');
-    err.status = 401;
-    throw err;
+    logger.warn({ email }, 'Login fallido: contraseña inválida');
+    throw createAppError('Invalid email or password', 401);
   }
 
   const user = new User(data);
@@ -65,19 +69,21 @@ async function loginUser({ email, password }) {
 }
 
 async function requestPasswordReset(email) {
-  const { data: user } = await supabase
+  const { data: user, error: userError } = await supabase
     .from('Users')
     .select('id, email')
     .eq('email', email)
     .maybeSingle();
 
-  if (error) {
-    const err = new Error(error.message);
-    err.status = 500;
-    throw err;
+  if (userError) {
+    logger.error({ email, error: userError.message }, 'Error buscando usuario para recuperación de contraseña');
+    throw createAppError('No se pudo iniciar la recuperación de contraseña', 500, userError.message);
   }
   // Silencioso para evitar enumeración de usuarios
-  if (!user) return;
+  if (!user) {
+    logger.info({ email }, 'Solicitud de recuperación para email no registrado');
+    return;
+  }
 
   const secret = authenticator.generateSecret();
   const token = hotp.generate(secret, 0);
@@ -88,16 +94,15 @@ async function requestPasswordReset(email) {
     .insert({ email: user.email, otp: secret, expires_at: expiresAt });
 
   if (error) {
-    const err = new Error(error.message);
-    err.status = 500;
-    throw err;
+    logger.error({ email: user.email, error: error.message }, 'Error guardando OTP de recuperación');
+    throw createAppError('No se pudo generar el código de recuperación', 500, error.message);
   }
 
   await sendPasswordResetEmail(user.email, token);
 }
 
 async function verifyOtp(email, token) {
-  const { data: otpRow } = await supabase
+  const { data: otpRow, error: otpError } = await supabase
     .from('password_reset_otps')
     .select('id, otp, expires_at')
     .eq('email', email)
@@ -107,7 +112,15 @@ async function verifyOtp(email, token) {
     .limit(1)
     .maybeSingle();
 
-  if (!otpRow) return false;
+  if (otpError) {
+    logger.error({ email, error: otpError.message }, 'Error verificando OTP en base de datos');
+    return false;
+  }
+
+  if (!otpRow) {
+    logger.warn({ email }, 'Verificación OTP sin código válido activo');
+    return false;
+  }
 
   return hotp.verify({ token, secret: otpRow.otp, counter: 0 });
 }
@@ -124,16 +137,18 @@ async function resetPassword(email, token, newPassword) {
     .maybeSingle();
 
   if (otpError || !otpRow) {
-    const err = new Error('Invalid or expired code. Request a new one.');
-    err.status = 400;
-    throw err;
+    if (otpError) {
+      logger.error({ email, error: otpError.message }, 'Error consultando OTP para resetear contraseña');
+    } else {
+      logger.warn({ email }, 'Reseteo rechazado: OTP inválido o expirado');
+    }
+    throw createAppError('Invalid or expired code. Request a new one.', 400);
   }
 
   const isValid = hotp.verify({ token, secret: otpRow.otp, counter: 0 });
   if (!isValid) {
-    const err = new Error('Invalid code');
-    err.status = 400;
-    throw err;
+    logger.warn({ email }, 'Reseteo rechazado: código OTP inválido');
+    throw createAppError('Invalid code', 400);
   }
 
   const hashedPassword = await bcrypt.hash(newPassword, 10);
@@ -144,16 +159,20 @@ async function resetPassword(email, token, newPassword) {
     .eq('email', email);
 
   if (updateError) {
-    const err = new Error(updateError.message);
-    err.status = 500;
-    throw err;
+    logger.error({ email, error: updateError.message }, 'Error actualizando contraseña');
+    throw createAppError('No se pudo actualizar la contraseña', 500, updateError.message);
   }
 
   // Marcar como usado para trazabilidad
-  await supabase
+  const { error: markUsedError } = await supabase
     .from('password_reset_otps')
     .update({ used: true })
     .eq('id', otpRow.id);
+
+  if (markUsedError) {
+    logger.error({ email, error: markUsedError.message }, 'Contraseña actualizada, pero no se pudo marcar el OTP como usado');
+    throw createAppError('No se pudo finalizar el proceso de recuperación', 500, markUsedError.message);
+  }
 }
 
 module.exports = { registerUser, loginUser, requestPasswordReset, verifyOtp, resetPassword };

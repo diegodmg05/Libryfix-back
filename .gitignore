@@ -2,3 +2,4 @@
 .env
 access.log
 package-lock.json
+logs/
