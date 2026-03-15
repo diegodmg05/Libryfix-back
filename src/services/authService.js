@@ -65,7 +65,7 @@ async function loginUser({ email, password }) {
 }
 
 async function requestPasswordReset(email) {
-  const { data: user, error } = await supabase
+  const { data: user } = await supabase
     .from('Users')
     .select('id, email')
     .eq('email', email)
