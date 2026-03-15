@@ -1,85 +1,112 @@
 # Libryfix-back (Backend)
 
-API REST del proyecto Libryfix: Express + Supabase. Sirve datos (usuarios, etc.) que consume el frontend Libryfix.
+API REST del proyecto Libryfix: Express + Supabase. Provee endpoints para autenticación, recuperación de contraseña, usuarios, libros y categorías.
 
 ## Requisitos
 
 - Node.js (v18 o superior recomendado)
-- Cuenta en [Supabase](https://supabase.com) y proyecto con una tabla `Users`
+- Cuenta en [Supabase](https://supabase.com) con las tablas necesarias (`Users`, `Books`, `Categories`, `password_reset_otps`, ...)
 
-## Estructura del proyecto
+## Estructura actual del proyecto
 
 ```
 Libryfix-back/
-├── controller/          # Lógica de negocio por recurso
-│   └── userController.js
-├── routes/              # Definición de rutas
-│   └── userRoutes.js
+├── .env
 ├── .gitignore
-├── app.js               # Punto de entrada (Express, middlewares, rutas)
 ├── package.json
-└── README.md
+├── server.js                # Punto de entrada (arranca la app)
+├── STRUCTURE.md
+└── src/
+    ├── app.js              # Configura Express, middlewares y rutas
+    ├── config/
+    │   ├── env.js          # Validación de variables de entorno
+    │   ├── supabase.js     # Cliente Supabase (singleton)
+    │   └── nodemailer.js   # Transporte nodemailer (singleton)
+    ├── controllers/        # Adaptadores HTTP (req/res)
+    │   ├── authController.js
+    │   └── userController.js
+    ├── middlewares/
+    │   ├── authMiddleware.js
+    │   └── errorHandler.js
+    ├── models/
+    │   ├── User.js
+    │   ├── Book.js
+    │   └── Category.js
+    ├── routes/
+    │   ├── index.js
+    │   ├── authRoutes.js
+    │   └── userRoutes.js
+    ├── services/
+    │   ├── authService.js
+    │   ├── emailService.js
+    │   └── userService.js
+    └── utils/
+        └── validators.js
 ```
 
-- **app.js:** Carga variables de entorno, configura Express (JSON, CORS, morgan), monta las rutas y arranca el servidor en el puerto 3000.
-- **routes/userRoutes.js:** Define las rutas bajo `/users` (ej. `GET /users/getUsers`) y las asocia a funciones del controlador.
-- **controller/userController.js:** Conecta con Supabase y devuelve los datos (ej. listado de usuarios).
+## Qué ha cambiado y por qué
 
-## Variables de entorno
+- Separación clara entre arranque (`server.js`) y configuración/express (`src/app.js`) para facilitar testing y despliegue.
+- Lógica de negocio movida a `src/services/` y controladores HTTP a `src/controllers/` (mejor testabilidad y separación de responsabilidades).
+- `src/config/` contiene singletons para Supabase y Nodemailer.
+- Se añadió autenticación JWT con middleware (`authMiddleware`) y manejo global de errores (`errorHandler`).
+- Recuperación de contraseña ahora usa HOTP (`otplib`) guardando el secret en la tabla de OTPs.
 
-Crea un archivo `.env` en la raíz del proyecto (no subirlo a git):
+## Variables de entorno (obligatorias)
+
+Crear un `.env` en la raíz con al menos:
 
 ```env
 SUPABASE_URL=https://tu-proyecto.supabase.co
 SECRET_KEY_SUPABASE=tu_service_role_key
-PUBLIC_KEY_SUPABASE=tu_anon_key
+JWT_SECRET=una_clave_larga_y_segura
+SMTP_HOST=smtp.example.com     # opcional para enviar correos
+SMTP_PORT=587
+SMTP_USER=usuario
+SMTP_PASS=pass
+FRONTEND_URL=http://localhost:5173
 ```
 
-- **SUPABASE_URL** y **SECRET_KEY_SUPABASE** son obligatorios; si faltan, la aplicación no arranca.
-- **PUBLIC_KEY_SUPABASE** se usa si en el futuro expones algo desde el cliente; el controlador actual usa la clave secreta en el servidor.
+`src/config/env.js` validará la presencia de las variables críticas al arrancar.
 
-## Comandos
+## Comandos habituales
 
-| Comando         | Descripción                    |
-|-----------------|--------------------------------|
-| `npm install`   | Instalar dependencias          |
-| `npm start`     | Arrancar servidor (node app.js)|
-| `npm run dev`   | Igual que start (desarrollo)   |
-| `npm test`      | Tests (por defecto sin definir)|
+```bash
+npm install
+npm start         # arranca server.js
+npm run dev       # usar nodemon si lo configuras (instala devDependency)
+```
 
-## Desplegar en desarrollo
+Para desarrollo con reinicio automático recomendamos `nodemon`:
 
-1. Instalar dependencias:
-   ```bash
-   npm install
-   ```
+```bash
+npm install -D nodemon
+npx nodemon server.js
+```
 
-2. Crear `.env` con `SUPABASE_URL` y `SECRET_KEY_SUPABASE` (y opcionalmente `PUBLIC_KEY_SUPABASE`).
+## Endpoints de ejemplo
 
-3. Arrancar el servidor:
-   ```bash
-   npm start
-   ```
-   o:
-   ```bash
-   node app.js
-   ```
+- `GET /` → `API funcionando 🚀`
+- `POST /auth/register` → registrar usuario
+- `POST /auth/login` → login (devuelve JWT)
+- `POST /auth/request-password-reset` → solicita código de recuperación (envía HOTP por email)
+- `POST /auth/verify-token` → verifica código
+- `POST /auth/reset-password` → resetea contraseña
+- `GET /users/getUsers` → lista de usuarios (protegido por JWT)
 
-4. El API queda disponible en **http://localhost:3000**
-   - Ruta de prueba: **GET** `http://localhost:3000/` → mensaje "API funcionando 🚀"
-   - Usuarios: **GET** `http://localhost:3000/users/getUsers` → JSON con usuarios de Supabase
+## Notas técnicas
 
-## Cómo funciona
+- HOTP: la implementación actual genera un secret y guarda ese secret en `password_reset_otps.otp`. El token enviado por email se genera con HOTP y se verifica con `otplib`.
+- Singletons: `src/config/supabase.js` y `src/config/nodemailer.js` exportan instancias reutilizables para evitar múltiples conexiones.
+- Models: `src/models/Book.js` y `src/models/Category.js` mapean las columnas de las tablas `Books` y `Categories` de la base de datos.
 
-- **Entrada:** `app.js` carga `dotenv`, Express, CORS, morgan y las rutas de usuarios.
-- **Rutas:** Las peticiones a `/users/*` se delegan a `routes/userRoutes.js` (ej. `GET /users/getUsers` → `getAllUsers`).
-- **Controlador:** `userController.js` usa el cliente de Supabase (con `SUPABASE_URL` y `SECRET_KEY_SUPABASE`) para leer la tabla `Users` y responder con JSON.
-- **CORS:** Configurado para permitir peticiones desde `http://localhost:5173` (frontend Vite).
-- **Logs:** Las peticiones se registran con morgan en `access.log`.
+## Desarrollo y pruebas
 
-## Tecnologías
+- Importa `src/app.js` en tus tests para usar `supertest` sin arrancar el servidor.
+- Añadir `repositories/` para encapsular llamadas a Supabase es recomendable si el proyecto crece.
 
-- **Express 5** (servidor HTTP)
-- **Supabase** (@supabase/supabase-js) para base de datos
-- **cors**, **dotenv**, **morgan**
-- **mongoose** y **supabase** (CLI) en dependencias; la lógica actual usa solo el cliente JS de Supabase
+## Recursos y referencia
+
+- Estructura y motivación: `STRUCTURE.md`
+- Buenas prácticas Node.js: https://github.com/goldbergyoni/nodebestpractices
+

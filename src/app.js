@@ -1,43 +1,22 @@
-require('dotenv').config();
-
 const express = require('express');
 const fs = require('fs');
 const path = require('path');
 const morgan = require('morgan');
 const cors = require('cors');
-const { createClient } = require('@supabase/supabase-js');
+const router = require('./routes');
+const errorHandler = require('./middlewares/errorHandler');
 
 const app = express();
-const userRoutes = require('./routes/userRoutes');
-const authRoutes = require('./routes/authRoutes');
-
-// ===============================
-// VALIDACIÓN DE VARIABLES .ENV
-// ===============================
-
-const {
-  SUPABASE_URL,
-  SECRET_KEY_SUPABASE,
-  PUBLIC_KEY_SUPABASE
-} = process.env;
-
-if (!SUPABASE_URL || !SECRET_KEY_SUPABASE) {
-  console.error("❌ Faltan variables de entorno de Supabase en .env");
-  process.exit(1);
-}
-
 
 // ===============================
 // LOGGING
 // ===============================
 
 const logStream = fs.createWriteStream(
-  path.join(__dirname, 'access.log'),
+  path.join(__dirname, '..', 'access.log'),
   { flags: 'a' }
 );
-
 app.use(morgan('combined', { stream: logStream }));
-
 
 // ===============================
 // MIDDLEWARES
@@ -51,33 +30,24 @@ app.use(cors({
   credentials: true
 }));
 
-app.use('/auth', authRoutes);
-app.use('/users', userRoutes);
-
-
-// ===============================
-// SUPABASE
-// ===============================
-
 // ===============================
 // RUTAS
 // ===============================
 
-app.get('/', (req, res) => {
-  res.send('API funcionando 🚀');
-});
+app.use('/', router);
+
+// ===============================
+// 404
+// ===============================
 
 app.use((req, res) => {
-  res.status(404).send('Ruta no encontrada');
+  res.status(404).json({ error: 'Ruta no encontrada' });
 });
 
-
 // ===============================
-// SERVER
+// ERROR HANDLER GLOBAL
 // ===============================
 
-const PORT = 3000;
+app.use(errorHandler);
 
-app.listen(PORT, () =>
-  console.log(`Servidor en http://localhost:${PORT}`)
-);
+module.exports = app;
