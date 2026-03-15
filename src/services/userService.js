@@ -5,6 +5,7 @@ const { createAppError } = require('../utils/AppError');
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
+
 async function getAllUsers() {
   const { data, error } = await supabase
     .from('Users')
