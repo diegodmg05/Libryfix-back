@@ -9,6 +9,7 @@ async function register(req, res, next) {
     if (!name || !surname || !email || !password) {
       return next(createAppError('All fields are required: name, surname, email, password', 400));
     }
+    if (!EMAIL_REGEX.test(email)) {
       return next(createAppError('Invalid email format', 400));
     }
 
@@ -18,12 +19,10 @@ async function register(req, res, next) {
     logger.info({ userId: user.id, email: user.email }, 'User registered successfully');
     res.status(201).json({ message: 'User registered successfully', user });
   } catch (err) {
-
-    if (!name || !surname || !email || !password) {
-      return next(createAppError('All fields are required: name, surname, email, password', 400));
-    }
+    next(err);
   }
-  
+}
+
 async function login(req, res, next) {
   try {
     const { email, password } = req.body;
@@ -92,4 +91,4 @@ async function resetPassword(req, res, next) {
   }
 }
 
-module.exports = { register, login, requestPasswordReset, verifyToken, resetPassword }
+module.exports = { register, login, requestPasswordReset, verifyToken, resetPassword };
