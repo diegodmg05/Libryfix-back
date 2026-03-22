@@ -20,7 +20,7 @@ async function register(req, res, next) {
   } catch (err) {
 
     if (!name || !surname || !email || !password) {
-      return res.status(400).json({ error: 'All fields are required: name, surname, email, password' });
+      return next(createAppError('All fields are required: name, surname, email, password', 400));
     }
   }
   
