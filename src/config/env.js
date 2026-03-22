@@ -1,3 +1,4 @@
+
 const { logger } = require('./logger');
 
 const REQUIRED_VARS = ['SUPABASE_URL', 'SECRET_KEY_SUPABASE', 'JWT_SECRET'];
