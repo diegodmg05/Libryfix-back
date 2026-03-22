@@ -1,6 +1,5 @@
 const bcrypt = require('bcrypt');
 const jwt = require('jsonwebtoken');
-const { hotp, authenticator } = require('otplib');
 const supabase = require('../config/supabase');
 const { logger } = require('../config/logger');
 const User = require('../models/User');
@@ -85,13 +84,12 @@ async function requestPasswordReset(email) {
     return;
   }
 
-  const secret = authenticator.generateSecret();
-  const token = hotp.generate(secret, 0);
+  const token = Math.floor(100000 + Math.random() * 900000).toString();
   const expiresAt = new Date(Date.now() + 15 * 60 * 1000).toISOString();
 
   const { error } = await supabase
     .from('password_reset_otps')
-    .insert({ email: user.email, otp: secret, expires_at: expiresAt });
+    .insert({ email: user.email, otp: token, expires_at: expiresAt });
 
   if (error) {
     logger.error({ email: user.email, error: error.message }, 'Error guardando OTP de recuperación');
@@ -122,7 +120,7 @@ async function verifyOtp(email, token) {
     return false;
   }
 
-  return hotp.verify({ token, secret: otpRow.otp, counter: 0 });
+  return otpRow.otp === token;
 }
 
 async function resetPassword(email, token, newPassword) {
@@ -145,7 +143,7 @@ async function resetPassword(email, token, newPassword) {
     throw createAppError('Invalid or expired code. Request a new one.', 400);
   }
 
-  const isValid = hotp.verify({ token, secret: otpRow.otp, counter: 0 });
+  const isValid = otpRow.otp === token;
   if (!isValid) {
     logger.warn({ email }, 'Reseteo rechazado: código OTP inválido');
     throw createAppError('Invalid code', 400);
