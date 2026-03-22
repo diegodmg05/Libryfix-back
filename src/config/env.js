@@ -1,7 +1,12 @@
 const REQUIRED_VARS = [
   'SUPABASE_URL',
   'SECRET_KEY_SUPABASE',
-  'JWT_SECRET'
+  'JWT_SECRET',
+  'SMTP_HOST',
+  'SMTP_PORT',
+  'SMTP_USER',
+  'SMTP_PASS',
+  'SMTP_FROM'
 ];
 
 const { logger } = require('./logger');
