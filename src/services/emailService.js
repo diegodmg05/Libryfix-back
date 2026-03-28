@@ -52,24 +52,6 @@ function getEmailProviderHint(error) {
   return 'No se pudo determinar la causa exacta del fallo SMTP con la informacion disponible.';
 }
 
-function getEmailProviderHint(error) {
-  const message = `${error?.message || ''} ${error?.response || ''}`.toLowerCase();
-
-  if (message.includes('sender') || message.includes('from') || message.includes('address rejected')) {
-    return 'El proveedor SMTP ha rechazado el remitente. Revisa SMTP_FROM y verifica que ese email o dominio este autorizado en Mailjet.';
-  }
-
-  if (message.includes('auth') || message.includes('invalid login') || message.includes('authentication')) {
-    return 'Las credenciales SMTP parecen invalidas o no estan cargadas en produccion.';
-  }
-
-  if (message.includes('connect') || message.includes('timeout') || message.includes('greeting')) {
-    return 'No se pudo establecer conexion con el servidor SMTP desde produccion.';
-  }
-
-  return 'No se pudo determinar la causa exacta del fallo SMTP con la informacion disponible.';
-}
-
 async function sendPasswordResetEmail(to, otp) {
   try {
     if (!MAILJET_API_KEY || !MAILJET_API_SECRET || !FROM_EMAIL) {
