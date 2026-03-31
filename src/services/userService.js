@@ -1,3 +1,4 @@
+const bcrypt = require('bcrypt');
 const supabase = require('../config/supabase');
 const { logger } = require('../config/logger');
 const User = require('../models/User');
