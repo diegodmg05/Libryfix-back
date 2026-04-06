@@ -43,6 +43,7 @@ app.use(
 // MIDDLEWARES
 // ===============================
 
+app.use('/orders/webhook', express.raw({ type: 'application/json' }));
 app.use(express.json());
 
 app.use(cors({

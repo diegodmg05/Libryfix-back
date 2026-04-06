@@ -1,7 +1,7 @@
 
 const { logger } = require('./logger');
 
-const REQUIRED_VARS = ['SUPABASE_URL', 'SECRET_KEY_SUPABASE', 'JWT_SECRET'];
+const REQUIRED_VARS = ['SUPABASE_URL', 'SECRET_KEY_SUPABASE', 'JWT_SECRET', 'STRIPE_SECRET_KEY'];
 
 REQUIRED_VARS.forEach((key) => {
   if (!process.env[key]) {
