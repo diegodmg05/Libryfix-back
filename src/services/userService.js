@@ -1,9 +1,11 @@
+const bcrypt = require('bcrypt');
 const supabase = require('../config/supabase');
 const { logger } = require('../config/logger');
 const User = require('../models/User');
 const { createAppError } = require('../utils/AppError');
 
 const EMAIL_REGEX = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
 
 async function getAllUsers() {
   const { data, error } = await supabase
@@ -88,11 +90,26 @@ async function createUser({ name, surname, email, password, rol }) {
   return new User(data);
 }
 
-async function updateUser({ id, name, surname, email, rol, status }) {
+async function updateUser({ id, name, surname, email, password, rol, status }) {
   const updateData = {};
   if (name !== undefined) updateData.name = name;
   if (surname !== undefined) updateData.surname = surname;
-  if (email !== undefined) updateData.email = email;
+  if (email !== undefined) {
+    if (!EMAIL_REGEX.test(email)) {
+      const err = new Error('Invalid email format');
+      err.status = 400;
+      throw err;
+    }
+    updateData.email = email;
+  }
+  if (password !== undefined) {
+    if (!password) {
+      const err = new Error('Password cannot be empty');
+      err.status = 400;
+      throw err;
+    }
+    updateData.password = await bcrypt.hash(password, 10);
+  }
   if (rol !== undefined) updateData.rol = rol;
   if (status !== undefined) updateData.status = status;
 
