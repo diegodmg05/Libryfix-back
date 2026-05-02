@@ -91,4 +91,25 @@ async function resetPassword(req, res, next) {
   }
 }
 
-module.exports = { register, login, requestPasswordReset, verifyToken, resetPassword };
+async function reactivate(req, res, next) {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return next(createAppError('Email and password are required', 400));
+    }
+    if (!EMAIL_REGEX.test(email)) {
+      return next(createAppError('Invalid email format', 400));
+    }
+
+    logger.info({ ip: req.ip, route: req.originalUrl, email }, 'Account reactivation attempt');
+
+    await authService.reactivateAccount(email, password);
+    logger.info({ email }, 'Account reactivated successfully');
+    res.status(200).json({ message: 'Account reactivated successfully' });
+  } catch (err) {
+    next(err);
+  }
+}
+
+module.exports = { register, login, requestPasswordReset, verifyToken, resetPassword, reactivate };
