@@ -173,4 +173,41 @@ async function resetPassword(email, token, newPassword) {
   }
 }
 
-module.exports = { registerUser, loginUser, requestPasswordReset, verifyOtp, resetPassword };
+async function reactivateAccount(email, password) {
+  const { data: user, error: userError } = await supabase
+    .from('Users')
+    .select('id, email, status')
+    .eq('email', email)
+    .maybeSingle();
+
+  if (userError) {
+    logger.error({ email, error: userError.message }, 'Error buscando usuario para reactivación');
+    throw createAppError('No se pudo verificar el usuario', 500, userError.message);
+  }
+
+  if (!user) {
+    logger.warn({ email }, 'Reactivación rechazada: usuario no encontrado');
+    throw createAppError('Account not found', 404);
+  }
+
+  if (user.status === true) {
+    logger.warn({ email }, 'Reactivación rechazada: cuenta ya está activa');
+    throw createAppError('Account is already active', 400);
+  }
+
+  const hashedPassword = await bcrypt.hash(password, 10);
+
+  const { error: updateError } = await supabase
+    .from('Users')
+    .update({ status: true, password: hashedPassword })
+    .eq('email', email);
+
+  if (updateError) {
+    logger.error({ email, error: updateError.message }, 'Error reactivando cuenta');
+    throw createAppError('No se pudo reactivar la cuenta', 500, updateError.message);
+  }
+
+  logger.info({ email }, 'Cuenta reactivada exitosamente');
+}
+
+module.exports = { registerUser, loginUser, requestPasswordReset, verifyOtp, resetPassword, reactivateAccount };
