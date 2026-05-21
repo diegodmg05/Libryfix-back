@@ -16,24 +16,6 @@ function getMailjetConfigSummary() {
   };
 }
 
-function getEmailProviderHint(status, responseText) {
-  const message = `${responseText || ''}`.toLowerCase();
-
-  if (status === 401 || status === 403 || message.includes('unauthorized')) {
-    return 'Mailjet ha rechazado las credenciales API. Revisa MAILJET_API_KEY y MAILJET_API_SECRET.';
-  }
-
-  if (message.includes('sender') || message.includes('from') || message.includes('not valid')) {
-    return 'Mailjet ha rechazado el remitente. Verifica que MAILJET_FROM_EMAIL o SMTP_FROM este autorizado en Mailjet.';
-  }
-
-  if (status >= 500) {
-    return 'Mailjet ha respondido con un error del servidor.';
-  }
-
-  return 'No se pudo determinar la causa exacta del fallo con la informacion disponible.';
-}
-
 function getEmailProviderHint(error) {
   const message = `${error?.message || ''} ${error?.response || ''}`.toLowerCase();
 
