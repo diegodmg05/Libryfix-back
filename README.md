@@ -110,3 +110,16 @@ npx nodemon server.js
 - Estructura y motivación: `STRUCTURE.md`
 - Buenas prácticas Node.js: https://github.com/goldbergyoni/nodebestpractices
 
+# Libryfix
+
+## Derechos de autor
+
+Copyright © 2026 Diego DMG
+
+Todos los derechos reservados.
+
+Este proyecto y todo su código fuente son propiedad exclusiva de Diego DMG.
+
+Este repositorio se publica únicamente con fines académicos, demostrativos y de evaluación. No está permitido copiar, modificar, redistribuir, comercializar o reutilizar total o parcialmente el código fuente sin autorización previa y por escrito del autor.
+
+Cualquier uso no autorizado podrá constituir una infracción de los derechos de propiedad intelectual.
