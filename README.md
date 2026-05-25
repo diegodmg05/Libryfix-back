@@ -73,8 +73,7 @@ FRONTEND_URL=http://localhost:5173
 
 ```bash
 npm install
-npm start         # arranca server.js
-npm run dev       # usar nodemon si lo configuras (instala devDependency)
+node server.js         # arranca server.js
 ```
 
 Para desarrollo con reinicio automático recomendamos `nodemon`:
